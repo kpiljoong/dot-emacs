@@ -1,0 +1,16 @@
+#+TITLE: hkk :: theme
+
+Load color theme Sanityinc Tomorrow
+#+begin_src elisp
+  (use-package color-theme-sanityinc-tomorrow
+               :ensure t
+               :init
+               (progn
+                 (load-theme 'sanityinc-tomorrow-night t)))
+#+end_src
+
+#+begin_src elisp
+(provide 'hkk-theme)
+#+end_src
+
+#+PROPERTY: tangle ~/.emacs.d/hkk/hkk-theme.el

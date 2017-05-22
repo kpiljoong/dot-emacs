@@ -1,0 +1,31 @@
+#+TITLE: hkk :: clojure
+
+#+begin_src elisp
+  (use-package clojure-mode
+    :ensure t
+    :defer t
+    :init
+    (progn
+      (add-to-list 'auto-mode-alist '("\\.boot\\'" . clojure-mode))
+      (add-to-list 'magic-mode-alist '(".* boot" . clojure-mode))))
+
+  (use-package cider
+    :ensure t
+    :defer t
+    :init
+    (progn
+      (setq cider-stacktrace-default-filters '(tooling dup)
+            cider-repl-pop-to-buffer-on-connect nil
+            cider-prompt-save-file-on-load nil
+            cider-repl-use-clojure-font-lock t)
+      (add-hook 'clojure-mode-hook 'cider-mode))
+    :config
+    (progn
+      (evil-set-initial-state 'cider-stracktrace-mode 'motion)
+      (evil-set-initial-state 'cider-popup-buffer-mode 'motion)
+      (setq cider-prompt-for-symbol nil)))
+
+(provide 'hkk-clojure)
+#+end_src
+
+#+PROPERTY: tangle "~/.emacs.d/hkk/hkk-clojure.el"

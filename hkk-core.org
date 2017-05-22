@@ -1,0 +1,446 @@
+#+TITLE: hkk :: core file
+
+#+begin_src elisp
+(message "hkk :: core")
+#+end_src
+
+
+** Functions
+#+begin_src elisp
+  (defvar hkk-useful-buffers-regexp
+    '("\\*\\(scratch\\|terminal\.\+\\|ansi-term\\|eshell\\)\\*"))
+
+  (defvar hkk-useless-buffers-regexp
+    '("*\.\+"))
+
+  (defun hkk/useless-buffer-p (buffer)
+    (let ((buf-paren-major-mode (get (with-current-buffer buffer major-mode)
+				     'derived-mode-parent))
+	  (buf-name (buffer-name buffer)))
+      (unless (cl-loop for regexp in hkk-useful-buffers-regexp do
+		       (when (or (eq buf-paren-major-mode 'comint-mode)
+				 (string-match regexp buf-name))
+			 (return t)))
+	(cl-loop for regexp in hkk-useful-buffers-regexp do
+		 (when (string-match regexp buf-name)
+		   (return t))))))
+
+  (defun hkk/next-buffer ()
+    (interactive)
+    (let ((start-buffer (current-buffer)))
+      (next-buffer)
+      (while (and (hkk/useless-buffer-p (current-buffer))
+		  (not (eq (current-buffer) start-buffer)))
+	(next-buffer))))
+
+  (defun hkk/previous-buffer ()
+    (interactive)
+    (let ((start-buffer (current-buffer)))
+      (previous-buffer)
+      (while (and (hkk/useless-buffer-p (current-buffer))
+		  (not (eq (current-buffer) start-buffer)))
+	(previous-buffer))))
+#+end_src
+
+
+** Required packages
+
+*** Common lisp primitives
+
+#+begin_src elisp
+(require 'cl)
+#+end_src
+
+Packages which should be loaded on startup rather than autoloaded on demand
+#+begin_src elisp
+(require 'cl-lib)
+(require 'saveplace)
+(require 'ffap)
+(require 'uniquify)
+(require 'ansi-color)
+(require 'recentf)
+#+end_src
+
+** ELPA archive repositories
+#+begin_src elisp
+  (setq package-archives
+	'(("gnu" . "http://elpa.gnu.org/packages/")
+	  ("org" . "http://orgmode.org/elpa/")
+	  ("melpa" . "https://melpa.org/packages/")
+	  ("marmalade" . "http://marmalade-repo.org/packages/")))
+
+  (package-initialize)
+
+  (unless package-archive-contents
+    (package-refresh-contents))
+#+end_src
+
+#+begin_src elisp
+  (defun hkk/load-or-install-package (pkg)
+    (package-install pkg)
+    (require pkg nil 'noerror))
+#+end_src
+
+** Install boostrap packages
+#+begin_src elisp
+(hkk/load-or-install-package 'evil)
+(hkk/load-or-install-package 'bind-map)
+(hkk/load-or-install-package 'bind-key)
+(hkk/load-or-install-package 'which-key)
+(hkk/load-or-install-package 'use-package)
+#+end_src
+
+#+begin_src elisp
+(defun hkk/open-emacs-directory ()
+  (interactive)
+  (dired "~/.emacs.d/"))
+#+end_src
+
+#+begin_src elisp
+(require 'hkk-evil)
+(require 'hkk-theme)
+#+end_src
+
+** Bind map
+#+begin_src elisp
+   (defvar hkk-command-key ":")
+  (defvar hkk-leader-key "SPC")
+
+ (defvar hkk-default-map (make-sparse-keymap))
+
+  (defun hkk/set-leader-keys (key def &rest bindings)
+    (while key
+      (define-key hkk-default-map (kbd key) def)
+      (setq key (pop bindings) def (pop bindings))))
+
+  (use-package bind-map
+    :init
+    (bind-map hkk-default-map
+      :prefix-cmd hkk-cmds
+      :evil-keys (hkk-leader-key)
+      :override-minor-modes t
+      :override-mode-name hkk-leader-override-mode))
+
+#+end_src
+
+#+begin_src elisp
+    (use-package evil
+      :init
+      (evil-mode 1)
+      :config
+      (progn
+	(define-key evil-normal-state-map (kbd hkk-command-key) 'evil-ex)
+	(define-key evil-visual-state-map (kbd hkk-command-key) 'evil-ex)
+	(define-key evil-motion-state-map (kbd hkk-command-key) 'evil-ex)
+	(define-key evil-normal-state-map "zf" 'reposition-window)
+	(setq-default evil-shift-width 2)))
+#+end_src
+
+Company.
+#+begin_src elisp
+    (use-package company
+      :ensure t
+      :init
+      (progn
+	(message "global-company-mode")
+	(add-hook 'after-init-hook 'global-company-mode)
+
+	(setq company-idle-delay 0.2
+	      company-minimum-prefix-length 2
+	      company-require-match nil
+	      company-dabbrev-ignore-case nil
+	      company-dabbrev-downcase nil)
+	(defvar-local company-fci-mode-on-p nil)
+
+	(defun company-turn-off-fci (&rest ignore)
+	  (when (boundp 'fci-mode)
+	    (setq company-fci-mode-on-p fci-mode)
+	    (when fci-mode (fci-mode -1))))
+	(defun company-maybe-turn-on-fci (&rest ignore)
+	  (when company-fci-mode-on-p (fci-mode 1)))
+
+	(add-hook 'company-completion-started-hook 'company-turn-off-fci)
+	(add-hook 'company-completion-finished-hook 'company-maybe-turn-on-fci)
+	(add-hook 'company-completion-cancelled-hook 'company-maybe-turn-on-fci))
+      :config
+      (progn
+	(custom-set-faces
+	 '(company-tooltip-common
+	   ((t (:inherit company-tooltip :weight bold :underline nil))))
+	 '(company-tooltip-common-selection
+	   ((t (:inherit company-tooltip-selection :weight bold :underilne nil))))))
+      :diminish company-mode)
+
+#+end_src
+
+Diminish.
+#+begin_src elisp
+  (use-package diminish
+    :init
+    (progn
+      (with-eval-after-load 'abbrev
+	(diminish 'abbrev-mode))
+      (with-eval-after-load 'hi-lock
+	(diminish 'hi-lock-mode))
+      (with-eval-after-load 'subword
+	(diminish 'subword-mode))))
+#+end_src
+
+ido.
+#+begin_src elisp
+  (ido-mode t)
+
+  (setq ido-save-directory-list-file (concat hkk-emacs-cache-directory "ido.last")
+	ido-enable-flex-matching t)
+
+  (use-package ido-vertical-mode
+    :ensure t
+    :init
+    (progn
+      (ido-vertical-mode t)
+
+      (defun hkk/ido-setup ()
+	(define-key ido-completion-map (kbd "C-<return>") 'ido-select-text)
+	(define-key ido-completion-map (kbd "C-h") 'ido-delete-backward-updir)
+	(define-key ido-completion-map (kbd "<up>") 'ido-prev-match)
+	(define-key ido-completion-map (kbd "<down>") 'ido-next-match)
+	(define-key ido-completion-map (kbd "<left>") 'ido-delete-backward-updir)
+	(define-key ido-completion-map (kbd "<right>") 'ido-exit-minibuffer)
+	)
+      (add-hook 'ido-setup-hook 'hkk/ido-setup)))
+#+end_src
+
+Flx ido
+#+begin_src elisp
+  (use-package flx-ido
+    :ensure t
+    :init
+    (flx-ido-mode 1))
+#+end_src
+
+Key bindings.
+#+begin_src elisp
+  (hkk/set-leader-keys
+   "bd" 'kill-this-buffer
+   "bk" 'ido-kill-buffer
+   "bn" 'hkk/next-buffer
+   "bp" 'hkk/previous-buffer
+   "br" 'rename-current-buffer-file
+   "bw" 'toggle-read-only
+   "TAB" 'hkk/alternate-buffer)
+
+  (hkk/set-leader-keys
+   "ac" 'calc-dispatch
+   "ad" 'dired
+   "ase" 'eshell)
+
+  (hkk/set-leader-keys
+   "ff" 'ido-find-file
+   "fg" 'rgrep
+   "fj" 'dired-jump
+   "fl" 'find-file-literally
+   "fS" 'evil-write-all
+   "fs" 'save-buffer
+   "ff" 'helm-find-files)
+
+  (hkk/set-leader-keys
+   "qq" 'kill-emacs
+   "qr" 'restart-emacs)
+
+#+end_src
+
+
+** Windows
+Initial window size
+#+begin_src elisp
+  (setq initial-frame-alist
+	'((width . 102)
+	  (height . 52)))
+
+  (setq default-frame-alist
+	'((width . 100)
+	  (height . 50)))
+
+#+end_src
+
+#+begin_src elisp
+#+end_src
+
+#+begin_src elisp
+#+end_src
+
+Make cursor a vertical bar.
+#+begin_src elisp
+  (setq-default cursor-type 'bar)
+#+end_src
+
+Enable copy/paste from emacs to other apps.
+#+begin_src elisp
+  (setq
+   interprogram-cut-function 'x-select-text
+   interprogram-paste-function 'x-selection-value
+   save-interprogram-paste-before-kill t
+   select-active-regions t
+   x-select-enable-clipboard t
+   x-select-enable-primary t)
+#+end_src
+
+#+begin_src elisp
+  (tooltip-mode -1)
+  (tool-bar-mode -1)
+  (menu-bar-mode -1)
+
+  (setq linum-format "%4d")
+
+  (global-hl-line-mode t)
+
+
+  (blink-cursor-mode 0)
+
+#+end_src
+
+Set UTF encoding.
+
+Make sure UTF-8 is used everywehre.
+
+#+begin_src elisp
+  (set-language-environment 'utf-8)
+  (set-terminal-coding-system 'utf-8)
+  (set-keyboard-coding-system 'utf-8)
+  (prefer-coding-system 'utf-8)
+  (setq locale-coding-system 'utf-8)
+  (setq default-buffer-file-coding-system 'utf-8-unix)
+#+end_src
+
+Opening Large Files - Warn when opening files bigger than 100MB.
+#+begin_src elisp
+(setq large-file-warning-threshold 100000000)
+#+end_src
+
+Enable global-auto-revert-mode
+#+begin_src elisp
+  (global-auto-revert-mode 1)
+  (setq auto-revert-verbose nil)
+  (setq global-auto-revert-non-file-buffers t)
+#+end_src
+
+Every buffer would be cleaned up before it's saved.
+#+begin_src elisp
+  (add-hook 'before-save-hook 'whitespace-cleanup)
+#+end_src
+
+
+Helm
+#+begin_src elisp
+  (use-package helm
+    :ensure t
+    :defer 1
+    :commands (hkk/helm-find-files)
+    :config
+    (progn
+      (setq helm-autoresize-min-height 10)
+      (helm-autoresize-mode 1)
+
+      (global-set-key (kbd "M-x") 'helm-M-x)
+
+      (defun hkk/helm-find-files (arg)
+	(interactive "P")
+	(let* ((hist (and arg helm-ff-history (helm-find-files-history)))
+	       (default-input hist)
+	       (input (cond ((and (eq major-mode 'dired-mode) default-input)
+			     (file-name-directory default-input))
+			    ((and (not (string= default-input ""))
+				  default-input))
+			    (t (expand-file-name (helm-current-directory))))))
+	  (set-text-properties 0 (length input) nil input)
+	  (helm-find-files-1 input)))
+
+      (defvar helm-source-header-default-background (face-attribute 'helm-source-header :background))
+      (defvar helm-source-header-default-foreground (face-attribute 'helm-source-header :foreground))
+      (defvar helm-source-header-default-box (face-attribute 'helm-source-header :box))
+      (defvar helm-source-header-default-height (face-attribute 'helm-source-header :height)))
+    :init
+    (progn
+      (setq helm-prevent-escaping-from-minibuffer t
+	    helm-bookmark-show-location t
+	    helm-display-header-line nil
+	    helm-split-window-in-side-p t
+	    helm-always-two-windows t
+	    helm-echo-input-in-header-line t
+	    helm-imenu-execute-action-at-once-if-one nil
+	    helm-org-format-outline-path t)
+      (setq helm-M-x-fuzzy-atch t
+	    helm-apropos-fuzzy-match t
+	    helm-file-cache-fuzzy-match t
+	    helm-lisp-fuzzy-completion t
+	    helm-recentf-fuzzy-match t
+	    helm-semantic-fuzzy-match t
+	    helm-buffers-fuzzy-matching t)
+      (hkk/set-leader-keys
+       "<f1>" 'helm-apropos
+       "bb"  'helm-mini
+       "Cl" 'helm-colors
+       "ff" 'hkk/helm-find-files
+       "fF" 'helm-find-files
+       "fr" 'helm-recentf
+       "hb" 'helm-filtered-bookmarks
+       "hl" 'helm-resume
+       "iu" 'helm-ucs
+       "rr" 'helm-register
+       "rm" 'helm-all-mark-rings))
+    :config
+    (progn
+      (helm-mode +1)
+      (helm-locate-set-command)))
+#+end_src
+
+#+begin_src elisp
+  (use-package helm-descbinds
+    :ensure t
+    :defer t
+    :init
+    (progn
+      (setq helm-descbinds-window-style 'split)
+      (add-hook 'helm-mode-hook 'helm-descbinds-mode)
+      (hkk/set-leader-keys "?" 'helm-descbinds)))
+#+end_src
+
+Helm flx
+#+begin_src elisp
+  (use-package helm-flx
+    :ensure t
+    :defer t)
+#+end_src
+
+Powerline.
+#+begin_src elisp
+  (use-package powerline
+    :ensure t
+    :init
+    (progn
+      (if (display-graphic-p)
+	  (setq powerline-default-separator 'arrow)
+	(setq powerline-default-separator 'utf-8))))
+#+end_src
+
+Restart emacs.
+#+begin_src elisp
+    (use-package restart-emacs
+      :ensure t
+      :defer t)
+
+#+end_src
+
+
+
+** Languages
+#+begin_src elisp
+(require 'hkk-clojure)
+#+end_src
+
+* Providing
+#+begin_src elisp
+(provide 'hkk-core)
+#+end_src
+
+#+PROPERTY: tangle "~/.emacs.d/hkk/hkk-core.el"

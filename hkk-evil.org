@@ -1,0 +1,10 @@
+#+TITLE: hkk :: evil
+
+
+
+#+begin_src elisp
+
+(provide 'hkk-evil)
+#+end_src
+
+#+PROPERTY: tangle ~/.emacs.d/hkk/hkk-evil.el
