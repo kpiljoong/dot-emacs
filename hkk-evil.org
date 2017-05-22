@@ -1,9 +1,27 @@
 #+TITLE: hkk :: evil
 
-
-
+Enabling Ctrl+u
 #+begin_src elisp
+  (setq-default evil-want-C-u-scroll t
+		evil-want-C-i-jump nil)
+#+end_src
 
+Package
+#+begin_src elisp
+    (use-package evil
+      :init
+      (evil-mode 1)
+      :config
+      (progn
+	(define-key evil-normal-state-map (kbd hkk-command-key) 'evil-ex)
+	(define-key evil-visual-state-map (kbd hkk-command-key) 'evil-ex)
+	(define-key evil-motion-state-map (kbd hkk-command-key) 'evil-ex)
+	(define-key evil-normal-state-map "zf" 'reposition-window)
+	(setq-default evil-shift-width 2)))
+#+end_src
+
+Provide
+#+begin_src elisp
 (provide 'hkk-evil)
 #+end_src
 

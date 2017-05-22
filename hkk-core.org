@@ -4,6 +4,11 @@
 (message "hkk :: core")
 #+end_src
 
+** Variables
+#+begin_src elisp
+  (defvar hkk-command-key ":")
+  (defvar hkk-leader-key "SPC")
+#+end_src
 
 ** Functions
 #+begin_src elisp
@@ -83,7 +88,6 @@ Packages which should be loaded on startup rather than autoloaded on demand
 
 ** Install boostrap packages
 #+begin_src elisp
-(hkk/load-or-install-package 'evil)
 (hkk/load-or-install-package 'bind-map)
 (hkk/load-or-install-package 'bind-key)
 (hkk/load-or-install-package 'which-key)
@@ -103,9 +107,6 @@ Packages which should be loaded on startup rather than autoloaded on demand
 
 ** Bind map
 #+begin_src elisp
-   (defvar hkk-command-key ":")
-  (defvar hkk-leader-key "SPC")
-
  (defvar hkk-default-map (make-sparse-keymap))
 
   (defun hkk/set-leader-keys (key def &rest bindings)
@@ -121,19 +122,6 @@ Packages which should be loaded on startup rather than autoloaded on demand
       :override-minor-modes t
       :override-mode-name hkk-leader-override-mode))
 
-#+end_src
-
-#+begin_src elisp
-    (use-package evil
-      :init
-      (evil-mode 1)
-      :config
-      (progn
-	(define-key evil-normal-state-map (kbd hkk-command-key) 'evil-ex)
-	(define-key evil-visual-state-map (kbd hkk-command-key) 'evil-ex)
-	(define-key evil-motion-state-map (kbd hkk-command-key) 'evil-ex)
-	(define-key evil-normal-state-map "zf" 'reposition-window)
-	(setq-default evil-shift-width 2)))
 #+end_src
 
 Company.
