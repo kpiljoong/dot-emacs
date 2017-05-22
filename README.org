@@ -1,0 +1,9 @@
+#+TITLE: hkk :: README
+
+* Installation
+
+** Automated
+
+#+begin_src sh
+curl -L https://github.com/kpiljoong/dot-emacs/raw/master/install.sh | sh
+#+end_src
