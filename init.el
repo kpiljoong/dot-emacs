@@ -11,8 +11,13 @@
 (package-initialize)
 
 (setq gc-cons-threshold 100000000)
-(defconst hkk/version "0.1" "hkk version")
-(defconst hkk/min-version "24.3" "Minimal required version of emacs")
+(defconst hkk-version "0.1" "hkk version")
+(defconst hkk-min-version "24.3" "Minimal required version of emacs")
+
+(if (not (version<= hkk-min-version emacs-version))
+    (error (concat "Your version of Emacs (%s) is incompatible "
+                   "hkk requires Emacs version %s or above.")
+           emacs-version hkk-min-version))
 
 (setq message-log-max 16384)
 (defconst emacs-start-time (current-time))
@@ -68,3 +73,18 @@
 
 ;; babeling org files
 (hkk/babel-org-files)
+(custom-set-variables
+ ;; custom-set-variables was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ '(package-selected-packages
+   (quote
+    (color-theme-sanityinc-tomorrow use-package which-key bind-key bind-map evil undo-tree goto-chg))))
+(custom-set-faces
+ ;; custom-set-faces was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ '(company-tooltip-common ((t (:inherit company-tooltip :weight bold :underline nil))))
+ '(company-tooltip-common-selection ((t (:inherit company-tooltip-selection :weight bold :underilne nil)))))

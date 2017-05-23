@@ -1,5 +1,6 @@
-#+TITLE: hkk :: core file
+#+TITLE: hkk :: core
 
+** Startup
 #+begin_src elisp
 (message "hkk :: core")
 #+end_src
@@ -8,10 +9,286 @@
 #+begin_src elisp
   (defvar hkk-command-key ":")
   (defvar hkk-leader-key "SPC")
+  (defvar hkk-major-mode-leader-key ",")
+#+end_src
+
+#+begin_src elisp
+  (defvar hkk-default-map (make-sparse-keymap))
+
+  (defvar hkk-toggles '())
+#+end_src
+
+#+begin_src elisp
+  (defvar hkk-default-map (make-sparse-keymap))
+
+  (defvar hkk--diminished-minor-modes nil
+    "List of diminished modes to unicode or ascii values.")
+#+end_src
+
+** Configurations
+
+#+begin_src elisp
+    (when (or (eq system-type 'windows-nt) (eq system-type 'msdos))
+      (setenv "PATH" (concat "C:\\Users\\ethan\\emacs\\bin;" (getenv "PATH")))
+      (setenv "PATH" (concat "C:\\msys64\\usr\\bin;" (getenv "PATH")))
+      (setenv "PATH" (concat "C:\\msys64\\mingw64\\bin;" (getenv "PATH")))
+      (setq exec-path (append exec-path '("C:\\msys64\\usr\\bin")))
+      (setq exec-path (append exec-path '("C:\\msys64\\mingw64\\bin"))))
+
+  ;    (setq find-program "C:\\msys64\\usr\\bin\\find.exe"
+  ;          grep-program "C:\\msys64\\usr\\\\bin\\grep.exe"))
+  ;    (setq find-program "C:\\Users\\ethan\\emacs\\bin\\find.exe"
+  ;          grep-program "C:\\Users\\ethan\\emacs\\bin\\grep.exe"))
+#+end_src
+
+Opening Large Files - Warn when opening files bigger than 100MB.
+#+begin_src elisp
+(setq large-file-warning-threshold 100000000)
+#+end_src
+
+#+begin_src elisp
+  (defvar hkk-auto-save-folder "~/.emacs.d/.saves/"
+    "Directory used for Emacs backups.")
+
+  (setq backup-directory-alist `(("." . "~/.emacs.d/.saves")))
+  (setq auto-save-file-name-transforms
+        `((".*" ,hkk-auto-save-folder t)))
+#+end_src
+
+Enable global-auto-revert-mode.
+#+begin_src elisp
+  (global-auto-revert-mode 1)
+#+end_src
+
+Also, auto refresh dired.
+#+begin_src elisp
+  (setq global-auto-revert-non-file-buffers t
+        auto-revert-verbose nil)
+#+end_src
+
+No beep!
+#+begin_src elisp
+  (setq ring-bell-function 'ignore
+        visible-bell nil)
+#+end_src
+
+Don't display the startup screen and message.
+#+begin_src elisp
+  (setq inhibit-startup-message t)
+  (setq inhibit-startup-screen t)
+#+end_src
+
+#+begin_src elisp
+  (tooltip-mode -1)
+  (tool-bar-mode -1)
+  (menu-bar-mode -1)
+
+  (setq linum-format "%4d")
+
+  (global-hl-line-mode t)
+
+  (visual-line-mode 1)
+#+end_src
+
+No lockfiles
+#+begin_src elisp
+  (setq create-lockfiles nil)
+#+end_src
+
+Use only spaces instead of tabs.
+#+begin_src elisp
+  (setq-default indent-tabs-mode nil
+                tab-width 2)
+#+end_src
+
+Use system trash for file deletion
+#+begin_src elisp
+  (setq delete-by-moving-to-trash t)
+#+end_src
+
+
+** Display
+
+Display column/row of cursor.
+#+begin_src elisp
+  (column-number-mode 1)
+#+end_src
+
+No cursor blinking.
+#+begin_src elisp
+  (blink-cursor-mode 0)
+#+end_src
+
+Show line numbers.
+#+begin_src elisp
+  (global-linum-mode 1)
+#+end_src
+
+
+Highlight current line
+#+begin_src elisp
+  (global-hl-line-mode t)
+#+end_src
+
+#+begin_src elisp
+  (setq scroll-conservatively 9999
+        scroll-preserve-screen-position t)
+#+end_src
+
+Use y/n instead of yes/no.
+#+begin_src elisp
+(defalias 'yes-or-no-p 'y-or-n-p)
+#+end_src
+
+Use mouse cursor in terminal mode.
+#+begin_src elisp
+  (xterm-mouse-mode 1)
+#+end_src
+
+Display the current function name in the modeline.
+#+begin_src elisp
+  (which-function-mode 0)
+#+end_src
+
+#+begin_src elisp
+  (defvar hkk-default-font "Source Code Pro")
+  (set-face-attribute 'default nil :font hkk-default-font)
+  (set-frame-font hkk-default-font nil t)
+  ;(hkk/set-default-font hkk-default-font)
+#+end_src
+
+** Macros
+
+Diminish
+#+begin_src elisp
+  (defmacro hkk|diminish (mode &optional unicode ascii)
+    "Diminish MODE name in mode line to UNICODE or ASCII depending on the value"
+    `(let ((cell (assq ',mode hkk--diminished-minor-modes)))
+       (if cell
+           (setcdr cell '(,unicode ,ascii))
+         (push '(,mode ,unicode ,ascii) hkk--diminished-minor-modes))))
+#+end_src
+
+Toggle
+#+begin_src elisp
+  (defmacro hkk|add-toggle (name &rest props)
+    "Add a toggle with NAME symbol."
+    (declare (indent 1))
+    (let* ((wrapper-func (intern (format "hkk/toggle-%s"
+                                         (symbol-name name))))
+           (wrapper-func-status (intern (format "%s-p" wrapper-func)))
+           (wrapper-func-on (intern (format "%s-on" wrapper-func)))
+           (wrapper-func-off (intern (format "%s-off" wrapper-func)))
+           (mode (plist-get props :mode))
+           (status (or mode (plist-get props :status)))
+           (condition (plist-get props :if))
+           (doc (plist-get props :if))
+           (on-body (if mode `((,mode)) (hkk/mplist-get props :on)))
+           (off-body (if mode `((,mode -1)) (hkk/mplist-get props :off)))
+           (prefix-arg-var (plist-get props :prefix))
+           (on-message (plist-get props :prefix))
+           (bindkeys (hkk//create-key-binding-form props wrapper-func))
+           (status-eval `(and (or (and (symbolp ',status) (boundp ',status))
+                                  (listp ',status))
+                              ,status)))
+      `(progn
+         (push (append '(,name) '(:function ,wrapper-func
+                                            :predicate ,wrapper-func-status) ',props)
+               hkk-toggles)
+         (defun ,wrapper-func ,(if prefix-arg-var (list prefix-arg-var) ())
+           ,(format "Toggle %s on and off." (symbol-name name))
+           ,(if prefix-arg-var '(interactive "P") '(interactive))
+           (if (or (null ',condition)
+                   (and (or (and (symbolp ',condition) (boundp ',condition))
+                            (listp ',condition))
+                        ,condition))
+               (if (,wrapper-func-status)
+                   (progn ,@off-body
+                          (when (called-interactively-p 'any)
+                            (message ,(format "%s disabled." name))))
+                 ,@on-body
+                 (when (called-interactively-p 'any)
+                   (message ,(or on-message (format "%s enabled." name)))))
+                 (message "This toggle is not supported.")))
+         (defun ,wrapper-func-status ()
+           ,(format "Check if %s is on." (symbol-name name))
+           ,status-eval)
+         ,@(when status
+             `((defun ,wrapper-func-on ()
+                 ,(format "Toggle %s on." (symbol-name name))
+                 (interactive)
+                 (unless (,wrapper-func-status) (,wrapper-func)))
+               (defun ,wrapper-func-off ()
+                 ,(format "Toggle %s off." (symbol-name name))
+                 (interactive)
+                 (when (,wrapper-func-status) (,wrapper-func)))))
+         ,@bindkeys)))
 #+end_src
 
 ** Functions
 #+begin_src elisp
+  (defun hkk/mplist-get (plist prop)
+    (let ((tail plist)
+          result)
+      (while (and (consp tail) (not (eq prop (car tail))))
+        (pop tail))
+      (pop tail)
+      (while (and (consp tail) (not (keywordp (car tail))))
+        (push (pop tail) result))
+      (nreverse result)))
+
+  (defun hkk//create-key-binding-form (props func)
+    (let ((evil-leader (hkk/mplist-get props :evil-leader))
+          (evil-leader-for-mode (hkk/mplist-get props :evil-leader-for-mode))
+          (global-key (hkk/mplist-get props :global-key))
+          (def-key (hkk/mplist-get props :define-key)))
+      (append
+       (when evil-leader
+         `((dolist (key ',evil-leader)
+             (hkk/set-leader-keys key ',func))))
+       (when evil-leader-for-mode
+         `((dolist (val ',evil-leaderfor-mode)
+             (hkk/set-leader-keys-for-major-mode
+              (car val) (cdr val) ',func))))
+       (when global-key
+         `((dolist (key ',global-key)
+             (global-set-key (kbd key) ',func))))
+       (when def-key
+         `((dolist (val ',def-key)
+             (define-key (eval (car val)) (kbd (cdr val)) ',func)))))))
+
+  (defun hkk/set-leader-keys (key def &rest bindings)
+    (while key
+      (define-key hkk-default-map (kbd key) def)
+      (setq key (pop bindings) def (pop bindings))))
+
+  (defun hkk//init-leader-mode-map (mode map &optional minor)
+    (let* ((prefix (intern (format "%s-prefix" map)))
+           (leader1 (when (hkk//acceptable-leader-p
+                           hkk-major-mode-leader-key)
+                      hkk-major-mode-leader-key))
+           (leader2 (when (hkk//acceptable-leader-p
+                           hkk-leader-key)
+                      (concat hkk-leader-key " m")))
+           (leaders (delq nil (list leader1 leader2))))
+      (or (boundp prefix)
+          (progn
+            (eval
+             `(bind-map ,map
+                :prefix-cmd ,prefix
+                ,(if minor :minor-modes :major-modes) (,mode)
+                :evil-keys ,leaders
+                :evil-states (normal motion visual evilified)))
+            (boundp prefix)))))
+
+
+  (defun hkk/set-leader-keys-for-mode (mode key def &rest bindings)
+    (let* ((map (intern (format "hkk-%s-map" mode))))
+      (when (hkk//init-leader-mode-map mode map)
+        (while key
+          (define-key (symbol-value map) (kbd key) def)
+          (setq key (pop bindings) def (pop bindings))))))
+
   (defvar hkk-useful-buffers-regexp
     '("\\*\\(scratch\\|terminal\.\+\\|ansi-term\\|eshell\\)\\*"))
 
@@ -20,31 +297,111 @@
 
   (defun hkk/useless-buffer-p (buffer)
     (let ((buf-paren-major-mode (get (with-current-buffer buffer major-mode)
-				     'derived-mode-parent))
-	  (buf-name (buffer-name buffer)))
+                                     'derived-mode-parent))
+          (buf-name (buffer-name buffer)))
       (unless (cl-loop for regexp in hkk-useful-buffers-regexp do
-		       (when (or (eq buf-paren-major-mode 'comint-mode)
-				 (string-match regexp buf-name))
-			 (return t)))
-	(cl-loop for regexp in hkk-useful-buffers-regexp do
-		 (when (string-match regexp buf-name)
-		   (return t))))))
+                       (when (or (eq buf-paren-major-mode 'comint-mode)
+                                 (string-match regexp buf-name))
+                         (return t)))
+        (cl-loop for regexp in hkk-useful-buffers-regexp do
+                 (when (string-match regexp buf-name)
+                   (return t))))))
 
   (defun hkk/next-buffer ()
     (interactive)
     (let ((start-buffer (current-buffer)))
       (next-buffer)
       (while (and (hkk/useless-buffer-p (current-buffer))
-		  (not (eq (current-buffer) start-buffer)))
-	(next-buffer))))
+                  (not (eq (current-buffer) start-buffer)))
+        (next-buffer))))
 
   (defun hkk/previous-buffer ()
     (interactive)
     (let ((start-buffer (current-buffer)))
       (previous-buffer)
       (while (and (hkk/useless-buffer-p (current-buffer))
-		  (not (eq (current-buffer) start-buffer)))
-	(previous-buffer))))
+                  (not (eq (current-buffer) start-buffer)))
+        (previous-buffer))))
+
+  (defun hkk/new-empty-buffer ()
+    "Create a new empty buffer"
+    (interactive)
+    (let ((newbf (generate-new-buffer-name "untitled")))
+      (switch-to-buffer newbf)))
+
+  (defun hkk/alternate-buffer (&optional window)
+    "Switch back and forth between current and last buffer in the current window."
+    (interactive)
+    (let ((current-buffer (window-buffer window))
+          (buffer-predicate
+           (frame-parameter (window-frame window) 'buffer-predicate)))
+      (switch-to-buffer
+       (or (cl-find-if (lambda (buffer)
+                         (and (not (eq buffer current-buffer))
+                              (or (null buffer-predicate)
+                                  (funcall buffer-predicate buffer))))
+                       (mapcar #'car (window-prev-buffers window)))
+           (other-buffer current-buffer t)))))
+
+  (defun hkk/alternate-window ()
+    "Switch back and forth between current and last window in the current frame."
+    (interactive)
+    (let ((prev-window (get-mru-window nil t t)))
+      (unless prev-window (user-error "Last window not found."))
+      (select-window prev-window)))
+
+  (defun hkk/split-window-below-and-focus ()
+    "Split the window vertically and focus the new window."
+    (interactive)
+    (split-window-below)
+    (windmove-down))
+
+  (defun hkk/split-window-right-and-focus ()
+    "Split the window horizontally and focus the new window."
+    (interactive)
+    (split-window-right)
+    (windmove-down))
+
+  (defun hkk/delete-window (&optional arg)
+    "Delete the current window."
+    (interactive "P")
+    (if (equal '(4) arg)
+        (kill-buffer-and-window)
+      (delete-window)))
+
+  (defun hkk/toggle-frame-fullscreen ()
+    "Toggling fullscreen"
+    (interactive)
+    (toggle-frame-fullscreen))
+
+  (defun hkk/kill-frame ()
+    (interactive)
+    (condition-case-unless-debug nil
+        (delete-frame nil 1)
+      (error
+       (make-frame-invisible nil 1))))
+
+  (defun hkk/scale-up-or-down-font-size (direction)
+    (interactive)
+    (let ((scale 0.5))
+      (if (eq direction 0)
+          (text-scale-set 0)
+        (if (< direction 0)
+            (text-scale-decrease scale)
+          (text-scale-increase scale)))))
+
+  (defun hkk/scale-up-font ()
+    (interactive)
+    (hkk/scale-up-or-down-font-size 1))
+
+  (defun hkk/scale-down-font ()
+    (interactive)
+    (hkk/scale-up-or-down-font-size -1))
+
+  (defun hkk/reset-font-size ()
+    (interactive)
+    (hkk/scale-up-or-down-font-size 0))
+
 #+end_src
 
 
@@ -61,18 +418,31 @@ Packages which should be loaded on startup rather than autoloaded on demand
 (require 'cl-lib)
 (require 'saveplace)
 (require 'ffap)
-(require 'uniquify)
+;(require 'uniquify)
 (require 'ansi-color)
 (require 'recentf)
+#+end_src
+
+
+*** Uniquify
+Buffer names for duplicate buffers.
+
+#+begin_src elisp
+  (use-package uniquify
+    :config
+    (setq uniquify-buffer-name-style 'forward
+          uniquify-separator "/"
+          uniquify-ignore-buffers-re "^\\*"
+          uniquify-after-kill-buffer-p t))
 #+end_src
 
 ** ELPA archive repositories
 #+begin_src elisp
   (setq package-archives
-	'(("gnu" . "http://elpa.gnu.org/packages/")
-	  ("org" . "http://orgmode.org/elpa/")
-	  ("melpa" . "https://melpa.org/packages/")
-	  ("marmalade" . "http://marmalade-repo.org/packages/")))
+        '(("gnu" . "http://elpa.gnu.org/packages/")
+          ("org" . "http://orgmode.org/elpa/")
+          ("melpa" . "https://melpa.org/packages/")
+          ("marmalade" . "http://marmalade-repo.org/packages/")))
 
   (package-initialize)
 
@@ -105,14 +475,26 @@ Packages which should be loaded on startup rather than autoloaded on demand
 (require 'hkk-theme)
 #+end_src
 
+** Which key
+#+begin_src elisp
+  (use-package which-key
+    :init
+    (progn
+      (hkk/set-leader-keys "hk" 'which-key-show-top-level)
+      (setq which-key-special-keys nil
+            which-key-use-C-h-for-paging t
+            which-key-prevent-C-h-from-cycling t
+            which-key-echo-keystrokes 0.02
+            which-key-max-description-length 32
+            which-key-sort-order 'which-key-key-order-alpha
+            which-key-idle-delay 0.3
+            which-key-allow-evil-operators t)
+      (which-key-mode)
+      (hkk|diminish which-key-mode " Ⓚ" " K")))
+#+end_src
+
 ** Bind map
 #+begin_src elisp
- (defvar hkk-default-map (make-sparse-keymap))
-
-  (defun hkk/set-leader-keys (key def &rest bindings)
-    (while key
-      (define-key hkk-default-map (kbd key) def)
-      (setq key (pop bindings) def (pop bindings))))
 
   (use-package bind-map
     :init
@@ -130,33 +512,33 @@ Company.
       :ensure t
       :init
       (progn
-	(message "global-company-mode")
-	(add-hook 'after-init-hook 'global-company-mode)
+        (message "global-company-mode")
+        (add-hook 'after-init-hook 'global-company-mode)
 
-	(setq company-idle-delay 0.2
-	      company-minimum-prefix-length 2
-	      company-require-match nil
-	      company-dabbrev-ignore-case nil
-	      company-dabbrev-downcase nil)
-	(defvar-local company-fci-mode-on-p nil)
+        (setq company-idle-delay 0.2
+              company-minimum-prefix-length 2
+              company-require-match nil
+              company-dabbrev-ignore-case nil
+              company-dabbrev-downcase nil)
+        (defvar-local company-fci-mode-on-p nil)
 
-	(defun company-turn-off-fci (&rest ignore)
-	  (when (boundp 'fci-mode)
-	    (setq company-fci-mode-on-p fci-mode)
-	    (when fci-mode (fci-mode -1))))
-	(defun company-maybe-turn-on-fci (&rest ignore)
-	  (when company-fci-mode-on-p (fci-mode 1)))
+        (defun company-turn-off-fci (&rest ignore)
+          (when (boundp 'fci-mode)
+            (setq company-fci-mode-on-p fci-mode)
+            (when fci-mode (fci-mode -1))))
+        (defun company-maybe-turn-on-fci (&rest ignore)
+          (when company-fci-mode-on-p (fci-mode 1)))
 
-	(add-hook 'company-completion-started-hook 'company-turn-off-fci)
-	(add-hook 'company-completion-finished-hook 'company-maybe-turn-on-fci)
-	(add-hook 'company-completion-cancelled-hook 'company-maybe-turn-on-fci))
+        (add-hook 'company-completion-started-hook 'company-turn-off-fci)
+        (add-hook 'company-completion-finished-hook 'company-maybe-turn-on-fci)
+        (add-hook 'company-completion-cancelled-hook 'company-maybe-turn-on-fci))
       :config
       (progn
-	(custom-set-faces
-	 '(company-tooltip-common
-	   ((t (:inherit company-tooltip :weight bold :underline nil))))
-	 '(company-tooltip-common-selection
-	   ((t (:inherit company-tooltip-selection :weight bold :underilne nil))))))
+        (custom-set-faces
+         '(company-tooltip-common
+           ((t (:inherit company-tooltip :weight bold :underline nil))))
+         '(company-tooltip-common-selection
+           ((t (:inherit company-tooltip-selection :weight bold :underilne nil))))))
       :diminish company-mode)
 
 #+end_src
@@ -167,11 +549,11 @@ Diminish.
     :init
     (progn
       (with-eval-after-load 'abbrev
-	(diminish 'abbrev-mode))
+        (diminish 'abbrev-mode))
       (with-eval-after-load 'hi-lock
-	(diminish 'hi-lock-mode))
+        (diminish 'hi-lock-mode))
       (with-eval-after-load 'subword
-	(diminish 'subword-mode))))
+        (diminish 'subword-mode))))
 #+end_src
 
 ido.
@@ -179,7 +561,7 @@ ido.
   (ido-mode t)
 
   (setq ido-save-directory-list-file (concat hkk-emacs-cache-directory "ido.last")
-	ido-enable-flex-matching t)
+        ido-enable-flex-matching t)
 
   (use-package ido-vertical-mode
     :ensure t
@@ -188,13 +570,13 @@ ido.
       (ido-vertical-mode t)
 
       (defun hkk/ido-setup ()
-	(define-key ido-completion-map (kbd "C-<return>") 'ido-select-text)
-	(define-key ido-completion-map (kbd "C-h") 'ido-delete-backward-updir)
-	(define-key ido-completion-map (kbd "<up>") 'ido-prev-match)
-	(define-key ido-completion-map (kbd "<down>") 'ido-next-match)
-	(define-key ido-completion-map (kbd "<left>") 'ido-delete-backward-updir)
-	(define-key ido-completion-map (kbd "<right>") 'ido-exit-minibuffer)
-	)
+        (define-key ido-completion-map (kbd "C-<return>") 'ido-select-text)
+        (define-key ido-completion-map (kbd "C-h") 'ido-delete-backward-updir)
+        (define-key ido-completion-map (kbd "<up>") 'ido-prev-match)
+        (define-key ido-completion-map (kbd "<down>") 'ido-next-match)
+        (define-key ido-completion-map (kbd "<left>") 'ido-delete-backward-updir)
+        (define-key ido-completion-map (kbd "<right>") 'ido-exit-minibuffer)
+        )
       (add-hook 'ido-setup-hook 'hkk/ido-setup)))
 #+end_src
 
@@ -206,48 +588,17 @@ Flx ido
     (flx-ido-mode 1))
 #+end_src
 
-Key bindings.
-#+begin_src elisp
-  (hkk/set-leader-keys
-   "bd" 'kill-this-buffer
-   "bk" 'ido-kill-buffer
-   "bn" 'hkk/next-buffer
-   "bp" 'hkk/previous-buffer
-   "br" 'rename-current-buffer-file
-   "bw" 'toggle-read-only
-   "TAB" 'hkk/alternate-buffer)
-
-  (hkk/set-leader-keys
-   "ac" 'calc-dispatch
-   "ad" 'dired
-   "ase" 'eshell)
-
-  (hkk/set-leader-keys
-   "ff" 'ido-find-file
-   "fg" 'rgrep
-   "fj" 'dired-jump
-   "fl" 'find-file-literally
-   "fS" 'evil-write-all
-   "fs" 'save-buffer
-   "ff" 'helm-find-files)
-
-  (hkk/set-leader-keys
-   "qq" 'kill-emacs
-   "qr" 'restart-emacs)
-
-#+end_src
-
 
 ** Windows
 Initial window size
 #+begin_src elisp
   (setq initial-frame-alist
-	'((width . 102)
-	  (height . 52)))
+        '((width . 102)
+          (height . 52)))
 
   (setq default-frame-alist
-	'((width . 100)
-	  (height . 50)))
+        '((width . 100)
+          (height . 50)))
 
 #+end_src
 
@@ -273,20 +624,6 @@ Enable copy/paste from emacs to other apps.
    x-select-enable-primary t)
 #+end_src
 
-#+begin_src elisp
-  (tooltip-mode -1)
-  (tool-bar-mode -1)
-  (menu-bar-mode -1)
-
-  (setq linum-format "%4d")
-
-  (global-hl-line-mode t)
-
-
-  (blink-cursor-mode 0)
-
-#+end_src
-
 Set UTF encoding.
 
 Make sure UTF-8 is used everywehre.
@@ -298,18 +635,6 @@ Make sure UTF-8 is used everywehre.
   (prefer-coding-system 'utf-8)
   (setq locale-coding-system 'utf-8)
   (setq default-buffer-file-coding-system 'utf-8-unix)
-#+end_src
-
-Opening Large Files - Warn when opening files bigger than 100MB.
-#+begin_src elisp
-(setq large-file-warning-threshold 100000000)
-#+end_src
-
-Enable global-auto-revert-mode
-#+begin_src elisp
-  (global-auto-revert-mode 1)
-  (setq auto-revert-verbose nil)
-  (setq global-auto-revert-non-file-buffers t)
 #+end_src
 
 Every buffer would be cleaned up before it's saved.
@@ -332,16 +657,16 @@ Helm
       (global-set-key (kbd "M-x") 'helm-M-x)
 
       (defun hkk/helm-find-files (arg)
-	(interactive "P")
-	(let* ((hist (and arg helm-ff-history (helm-find-files-history)))
-	       (default-input hist)
-	       (input (cond ((and (eq major-mode 'dired-mode) default-input)
-			     (file-name-directory default-input))
-			    ((and (not (string= default-input ""))
-				  default-input))
-			    (t (expand-file-name (helm-current-directory))))))
-	  (set-text-properties 0 (length input) nil input)
-	  (helm-find-files-1 input)))
+        (interactive "P")
+        (let* ((hist (and arg helm-ff-history (helm-find-files-history)))
+               (default-input hist)
+               (input (cond ((and (eq major-mode 'dired-mode) default-input)
+                             (file-name-directory default-input))
+                            ((and (not (string= default-input ""))
+                                  default-input))
+                            (t (expand-file-name (helm-current-directory))))))
+          (set-text-properties 0 (length input) nil input)
+          (helm-find-files-1 input)))
 
       (defvar helm-source-header-default-background (face-attribute 'helm-source-header :background))
       (defvar helm-source-header-default-foreground (face-attribute 'helm-source-header :foreground))
@@ -350,20 +675,20 @@ Helm
     :init
     (progn
       (setq helm-prevent-escaping-from-minibuffer t
-	    helm-bookmark-show-location t
-	    helm-display-header-line nil
-	    helm-split-window-in-side-p t
-	    helm-always-two-windows t
-	    helm-echo-input-in-header-line t
-	    helm-imenu-execute-action-at-once-if-one nil
-	    helm-org-format-outline-path t)
+            helm-bookmark-show-location t
+            helm-display-header-line nil
+            helm-split-window-in-side-p t
+            helm-always-two-windows t
+            helm-echo-input-in-header-line t
+            helm-imenu-execute-action-at-once-if-one nil
+            helm-org-format-outline-path t)
       (setq helm-M-x-fuzzy-atch t
-	    helm-apropos-fuzzy-match t
-	    helm-file-cache-fuzzy-match t
-	    helm-lisp-fuzzy-completion t
-	    helm-recentf-fuzzy-match t
-	    helm-semantic-fuzzy-match t
-	    helm-buffers-fuzzy-matching t)
+            helm-apropos-fuzzy-match t
+            helm-file-cache-fuzzy-match t
+            helm-lisp-fuzzy-completion t
+            helm-recentf-fuzzy-match t
+            helm-semantic-fuzzy-match t
+            helm-buffers-fuzzy-matching t)
       (hkk/set-leader-keys
        "<f1>" 'helm-apropos
        "bb"  'helm-mini
@@ -407,8 +732,8 @@ Powerline.
     :init
     (progn
       (if (display-graphic-p)
-	  (setq powerline-default-separator 'arrow)
-	(setq powerline-default-separator 'utf-8))))
+          (setq powerline-default-separator 'arrow)
+        (setq powerline-default-separator 'utf-8))))
 #+end_src
 
 Restart emacs.
@@ -420,8 +745,34 @@ Restart emacs.
 #+end_src
 
 
+Popwin
+#+begin_src elisp
+  (use-package popwin
+    :config
+    (progn
+      (popwin-mode 1)
+      (hkk/set-leader-keys "wpm" 'popwin:messages)
+      (hkk/set-leader-keys "wpp" 'popwin:close-popup-window)
+
+      (setq popwin:special-display-config nil)
+
+      (push '("*Help*" :dedicated t :position bottom :stick t :noselect t :height 0.4) popwin:special-display-config)
+      (push '("*undo-tree*" :dedicated t :position bottom :stick t :noselect t :height 0.4) popwin:special-display-config)
+      (push '("*grep*" :dedicated t :position bottom :stick t :noselect t) popwin:special-display-config)))
+#+end_src
+
+** Key bindings
+#+begin_src elisp
+(require 'hkk-keybindings)
+#+end_src
 
 ** Languages
+Setting for elisp
+#+begin_src elisp
+(require 'hkk-elisp)
+#+end_src
+
+Setting for clojure
 #+begin_src elisp
 (require 'hkk-clojure)
 #+end_src

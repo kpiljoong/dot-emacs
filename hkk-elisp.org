@@ -1,0 +1,20 @@
+#+TITLE: hkk :: elisp
+
+#+begin_src elisp
+  (use-package elisp-slime-nav
+    :ensure t
+    :demand t
+    :config
+    (progn
+      (defun hkk/lisp-hook ()
+	(elisp-slime-nav-mode)
+	(turn-on-eldoc-mode))
+      (add-hook 'emacs-lisp-mode-hook 'hkk/lisp-hook)
+
+      (evil-define-key 'normal emacs-lisp-mode-map (kbd "K")
+	'elisp-slime-nav-describe-elisp-thing-at-point)))
+
+  (provide 'hkk-elisp)
+#+end_src
+
+#+PROPERTY: tangle "~/.emacs.d/hkk/hkk-elisp.el"

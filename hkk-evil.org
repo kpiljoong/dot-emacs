@@ -1,23 +1,38 @@
 #+TITLE: hkk :: evil
 
-Enabling Ctrl+u
+Enabling Ctrl+u, it must appear before the call to (require 'evil).
 #+begin_src elisp
   (setq-default evil-want-C-u-scroll t
-		evil-want-C-i-jump nil)
+    evil-want-C-i-jump nil)
 #+end_src
 
 Package
 #+begin_src elisp
-    (use-package evil
-      :init
-      (evil-mode 1)
-      :config
-      (progn
-	(define-key evil-normal-state-map (kbd hkk-command-key) 'evil-ex)
-	(define-key evil-visual-state-map (kbd hkk-command-key) 'evil-ex)
-	(define-key evil-motion-state-map (kbd hkk-command-key) 'evil-ex)
-	(define-key evil-normal-state-map "zf" 'reposition-window)
-	(setq-default evil-shift-width 2)))
+  (use-package evil
+    :init
+    ;; evil must be require explicitly.
+    (evil-mode 1)
+    :config
+    (progn
+      (define-key evil-normal-state-map (kbd hkk-command-key) 'evil-ex)
+      (define-key evil-visual-state-map (kbd hkk-command-key) 'evil-ex)
+      (define-key evil-motion-state-map (kbd hkk-command-key) 'evil-ex)
+      (define-key evil-normal-state-map "zf" 'reposition-window)
+      (setq-default evil-shift-width 2)
+      (when (display-graphic-p)
+  (setq evil-emacs-state-cursor '("gold3" box))
+  (setq evil-normal-state-cursor '("white" box))
+  (setq evil-visual-state-cursor '("white" box))
+  (setq evil-insert-state-cursor '("DodgerBlue2" bar))
+  (setq evil-replace-state-cursor '("deep pink" bar))
+  (setq evil-operator-state-cursor '("deep pink" hollow)))))
+  ;(setq evil-emacs-state-cursor '("red" box))
+  ;(setq evil-normal-state-cursor '("green" box))
+  ;(setq evil-visual-state-cursor '("orange" box))
+  ;(setq evil-insert-state-cursor '("red" bar))
+  ;(setq evil-replace-state-cursor '("red" bar))
+  ;(setq evil-operator-state-cursor '("red" hollow)))))
+
 #+end_src
 
 Provide

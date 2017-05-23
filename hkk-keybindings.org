@@ -1,0 +1,160 @@
+#+TITLE: hkk :: key bindings
+
+
+Quickly display current keystrokes in mini buffer.
+#+begin_src elisp
+  (setq echo-keystrokes 0.02)
+#+end_src
+
+
+Enable auto-indent on RET
+#+begin_src elisp
+    (define-key global-map (kbd "RET") 'newline-and-indent)
+#+end_src
+
+Function to declare prefix for which-key.
+#+begin_src elisp
+  (defun hkk/declare-prefix (prefix name &optional long-name)
+    "Declare a prefix PREFIX."
+    (let* ((command name)
+           (full-prefix (concat hkk-leader-key " " prefix))
+           (full-prefix-lst (listify-key-sequence (kbd full-prefix))))
+      (unless long-name (setq long-name name))
+      (which-key-declare-prefixes
+        full-prefix (cons name long-name))))
+
+  (put 'hkk/declare-prefix 'lisp-indent-function 'defun)
+#+end_src
+
+Define key binding prefixes for which-key.
+#+begin_src elisp
+  (setq hkk/key-binding-prefixes '(("a" "applications")
+                                   ("b" "buffers")
+                                   ("f" "files")
+                                   ("h" "help")
+                                   ("hd" "help-describes")
+                                   ("p" "projects")
+                                   ("q" "quit")
+                                   ("t" "toggles")
+                                   ("T" "UI toggles")
+                                   ("w" "windows")
+                                   ("z" "zoom")))
+
+  (mapc (lambda (x) (apply #'hkk/declare-prefix x))
+        hkk/key-binding-prefixes)
+#+end_src
+
+
+Leader key bindings.
+#+begin_src elisp
+  (hkk/set-leader-keys
+   "ac" 'calc-dispatch
+   "ad" 'dired
+   "ase" 'eshell)
+
+  (hkk/set-leader-keys
+   "bd" 'kill-this-buffer
+   "bk" 'ido-kill-buffer
+   "bn" 'hkk/next-buffer
+   "bN" 'hkk/new-empty-buffer
+   "bp" 'hkk/previous-buffer
+   "br" 'rename-current-buffer-file
+   "bw" 'toggle-read-only
+   "TAB" 'hkk/alternate-buffer)
+
+  (hkk/set-leader-keys
+   "ff" 'ido-find-file
+   "fg" 'rgrep
+   "fj" 'dired-jump
+   "fl" 'find-file-literally
+   "fS" 'evil-write-all
+   "fs" 'save-buffer
+   "ff" 'helm-find-files)
+
+  (hkk/set-leader-keys
+   "hdb" 'describe-bindings
+   "hdc" 'describe-char
+   "hdf" 'describe-function
+   "hdk" 'describe-key
+   "hdp" 'describe-package
+   "hdt" 'describe-theme
+   "hdv" 'describe-variable)
+
+  (hkk/set-leader-keys
+   "w TAB" 'hkk/alternate-window
+   "ww" 'hkk/alternate-window
+   "w2" 'hkk/layout-double-columns
+   "w3" 'hkk/layout-triple-columns
+   "wb" 'hkk/switch-to-minibuffer-window
+   "wd" 'hkk/delete-window
+   "ws" 'split-window-below
+   "wS" 'hkk/split-window-below-and-focus
+   "w-" 'split-window-below
+   "wv" 'split-window-right
+   "wV" 'hkk/split-window-right-and-focus
+   "w=" 'balance-windows)
+
+  (hkk/set-leader-keys
+   "qq" 'kill-emacs
+   "qr" 'restart-emacs
+   "qz" 'hkk/kill-frame)
+
+  (hkk/set-leader-keys
+   "+" 'hkk/scale-up-font
+   "=" 'hkk/scale-up-font
+   "-" 'hkk/scale-down-font
+   "0" 'hkk/reset-font-size)
+#+end_src
+
+SPC-b-NUM will change current buffer.
+#+begin_src elisp
+  (dotimes (i 9)
+    (let ((n (+ i 1)))
+      (hkk/set-leader-keys (format "b%i" n)
+                           (intern (format "buffer-to-window-%s" n)))))
+#+end_src
+
+Toggle fullscreen frame.
+#+begin_src elisp
+  (hkk|add-toggle fullscreen-frame
+    :status (memq (frame-parameter nil 'fullscreen) '(fullscreen fullboth))
+    :on (hkk/toggle-frame-fullscreen)
+    :off (hkk/toggle-frame-fullscreen)
+    :documentation "Display the current frame in full screen."
+    :evil-leader "TF")
+#+end_src
+
+Toggle current line highlight.
+#+begin_src elisp
+  (hkk|add-toggle highlight-current-line-globally
+    :mode global-hl-line-mode
+    :evil-leader "thh")
+#+end_src
+
+Toggle truncate lines.
+#+begin_src elisp
+  (hkk|add-toggle truncate-lines
+    :status truncate-lines
+    :on (toggle-truncate-lines)
+    :off (toggle-truncate-lines -1)
+    :evil-leader "tl")
+#+end_src
+
+
+Toggle maximize frame.
+#+begin_src elisp
+  (hkk|add-toggle maximize-frame
+    :status (eq (frame-parameter nil 'fullscreen) 'maximized)
+    :on (toggle-frame-maximized)
+    :off (toggle-frame-maximized)
+    :evil-leader "TM")
+#+end_src
+
+
+Provide this!
+#+begin_src elisp
+(provide 'hkk-keybindings)
+#+end_src
+
+
+#+PROPERTY: tangle "~/.emacs.d/hkk/hkk-keybindings.el"
