@@ -2,7 +2,10 @@
 
 ** Startup
 #+begin_src elisp
+
+(setq debug-on-error t)
 (message "hkk :: core")
+
 #+end_src
 
 ** Variables
@@ -16,6 +19,10 @@
   (defvar hkk-default-map (make-sparse-keymap))
 
   (defvar hkk-toggles '())
+
+  (defvar hkk-command-key "SPC")
+  (defvar hkk-emacs-command-key "SPC")
+  ;(defalias 'hkk-emacs-command-key 'hkk-command-key)
 #+end_src
 
 #+begin_src elisp
@@ -23,7 +30,19 @@
 
   (defvar hkk--diminished-minor-modes nil
     "List of diminished modes to unicode or ascii values.")
+
+  (defvar hkk-repl-list '())
+
+  (defvar hkk-search-tools '("ag"))
 #+end_src
+
+#+begin_src elisp
+  (defvar-local hkk--gne-min-line nil)
+  (defvar-local hkk--gne-max-line nil)
+  (defvar-local hkk--gne-cur-line 0)
+  (defvar-local hkk--gne-line-func nil)
+#+end_src
+
 
 ** Configurations
 
@@ -90,7 +109,7 @@ Don't display the startup screen and message.
   (visual-line-mode 1)
 #+end_src
 
-No lockfiles
+No lockfiles.
 #+begin_src elisp
   (setq create-lockfiles nil)
 #+end_src
@@ -113,6 +132,18 @@ Display column/row of cursor.
 #+begin_src elisp
   (column-number-mode 1)
 #+end_src
+
+Display line number.
+#+begin_src elisp
+  (line-number-mode t)
+#+end_src
+
+Display size indication.
+#+begin_src elisp
+  (size-indication-mode t)
+#+end_src
+
+
 
 No cursor blinking.
 #+begin_src elisp
@@ -148,6 +179,11 @@ Use mouse cursor in terminal mode.
 Display the current function name in the modeline.
 #+begin_src elisp
   (which-function-mode 0)
+#+end_src
+
+Disable fringe.
+#+begin_src elisp
+  (fringe-mode '(0 . 0))
 #+end_src
 
 #+begin_src elisp
@@ -225,6 +261,15 @@ Toggle
          ,@bindkeys)))
 #+end_src
 
+
+Make eval-after-load more cleaner since it is well used.
+#+begin_src elisp
+  (defmacro after (mode &rest body)
+    (declare (indent defun))
+    `(eval-after-load ,mode
+       '(progn ,@body)))
+#+end_src
+
 ** Functions
 #+begin_src elisp
   (defun hkk/mplist-get (plist prop)
@@ -261,6 +306,11 @@ Toggle
     (while key
       (define-key hkk-default-map (kbd key) def)
       (setq key (pop bindings) def (pop bindings))))
+  (put 'hkk/set-leader-keys 'lisp-indent-function 'defun)
+  (defalias 'evil-leader/set-key 'hkk/set-leader-keys)
+
+  (defun hkk//acceptable-leader-p (key)
+    (and (stringp key) (not (string= key ""))))
 
   (defun hkk//init-leader-mode-map (mode map &optional minor)
     (let* ((prefix (intern (format "%s-prefix" map)))
@@ -282,12 +332,23 @@ Toggle
             (boundp prefix)))))
 
 
-  (defun hkk/set-leader-keys-for-mode (mode key def &rest bindings)
+  (defun hkk/set-leader-keys-for-major-mode (mode key def &rest bindings)
     (let* ((map (intern (format "hkk-%s-map" mode))))
       (when (hkk//init-leader-mode-map mode map)
         (while key
           (define-key (symbol-value map) (kbd key) def)
           (setq key (pop bindings) def (pop bindings))))))
+
+  (defalias 'evil-leader/set-key-for-mode
+    'hkk/set-leader-keys-for-major-mode)
+
+  (defun hkk/set-leader-keys-for-minor-mode (mode key def &rest bindings)
+    (let* ((map (intern (format "hkk-%s-map" mode))))
+      (when (hkk//init-leader-mode-map mode map t)
+        (while key
+          (define-key (symbol-value map) (kbd key) def)
+          (setq key (pop bindings) def (pop bindings))))))
+  (put 'hkk/set-leader-keys-for-minor-mode 'lisp-indent-function 'defun)
 
   (defvar hkk-useful-buffers-regexp
     '("\\*\\(scratch\\|terminal\.\+\\|ansi-term\\|eshell\\)\\*"))
@@ -402,8 +463,54 @@ Toggle
     (interactive)
     (hkk/scale-up-or-down-font-size 0))
 
+  (defun hkk/update-emacs-title ()
+    (if (buffer-file-name (current-buffer))
+        (setq frame-title-format "hkk - %f")
+      (setq frame-title-format "hkk - %b")))
+
+  (defun hkk//helm-find-files-edit (candidate)
+    (dired (file-name-directory candidate))
+    (dired-goto-file candidate)
+    (dired-toggle-read-only))
+
+  (defun hkk/helm-find-files-edit ()
+    (interactive)
+    (helm-exit-and-execute-action 'hkk//helm-find-files-edit))
+
+  (defun hkk/gne-next (num reset)
+    (when reset (setq hkk--gne-cur-line
+                      hkk--gne-min-line))
+    (setq hkk--gen-cur-line
+          (min hkk--gne-max-line
+               (max hkk--gne-min-line
+                    (+ num hkk--gne-cur-line))))
+    (goto-line hkk--gne-cur-line)
+    (funcall hkk--gne-line-func
+             (buffer-substring (point-at-bol) (point-at-eol))))
+
+  (defun hkk//gne-init-helm-ag (&rest args)
+    (with-current-buffer "*helm ag results*"
+      (setq hkk--gne-min-line 5
+            hkk--gne-max-line (save-excursion
+              (goto-char (point-max))
+              (previous-line)
+              (line-number-at-pos))
+            hkk--gne-line-func
+            (lambda (c)
+              (helm-ag--find-file-action
+               c 'find-file helm-ag--search-this-file-p))
+            next-error-function 'hkk/gne-ext)))
+
+  (defun hkk//helm-cleanup ()
+    (setq overriding-terminal-local-map nil))
 #+end_src
 
+#+begin_src elisp
+  (cl-dolist (hook '(buffer-list-update-hook
+                     change-major-mode-hook
+                     find-file-hook))
+    (add-hook hook 'hkk/update-emacs-title))
+#+end_src
 
 ** Required packages
 
@@ -418,20 +525,19 @@ Packages which should be loaded on startup rather than autoloaded on demand
 (require 'cl-lib)
 (require 'saveplace)
 (require 'ffap)
-;(require 'uniquify)
 (require 'ansi-color)
-(require 'recentf)
 #+end_src
 
 
 *** Uniquify
-Buffer names for duplicate buffers.
 
+Better names for duplicate buffers.
 #+begin_src elisp
   (use-package uniquify
     :config
     (setq uniquify-buffer-name-style 'forward
           uniquify-separator "/"
+          ;; leave special buffers alone
           uniquify-ignore-buffers-re "^\\*"
           uniquify-after-kill-buffer-p t))
 #+end_src
@@ -588,7 +694,6 @@ Flx ido
     (flx-ido-mode 1))
 #+end_src
 
-
 ** Windows
 Initial window size
 #+begin_src elisp
@@ -611,6 +716,11 @@ Initial window size
 Make cursor a vertical bar.
 #+begin_src elisp
   (setq-default cursor-type 'bar)
+#+end_src
+
+Hide mouse cursor while typing.
+#+begin_src elisp
+  (setq make-pointer-invisible t)
 #+end_src
 
 Enable copy/paste from emacs to other apps.
@@ -643,7 +753,7 @@ Every buffer would be cleaned up before it's saved.
 #+end_src
 
 
-Helm
+** Helm
 #+begin_src elisp
   (use-package helm
     :ensure t
@@ -651,10 +761,10 @@ Helm
     :commands (hkk/helm-find-files)
     :config
     (progn
+      (helm-mode)
       (setq helm-autoresize-min-height 10)
       (helm-autoresize-mode 1)
-
-      (global-set-key (kbd "M-x") 'helm-M-x)
+      (helm-locate-set-command)
 
       (defun hkk/helm-find-files (arg)
         (interactive "P")
@@ -668,12 +778,29 @@ Helm
           (set-text-properties 0 (length input) nil input)
           (helm-find-files-1 input)))
 
+      (defun helm-available-repls ()
+        (interactive)
+        (let ((helm-available-repls
+               `((name . "HELM available REPLs")
+                 (candidates . ,(mapcar #'car hkk-repl-list))
+                 (action . (lambda (candidate)
+                             (let ((repl (cedr (assoc candidate hkk-repl-list))))
+                               (require (car repl))
+                               (call-interactively (cdr repl))))))))
+          (helm :sources '(helm-available-repls)
+                :buffer "*helm repls")))
+
       (defvar helm-source-header-default-background (face-attribute 'helm-source-header :background))
       (defvar helm-source-header-default-foreground (face-attribute 'helm-source-header :foreground))
       (defvar helm-source-header-default-box (face-attribute 'helm-source-header :box))
       (defvar helm-source-header-default-height (face-attribute 'helm-source-header :height)))
     :init
     (progn
+      (add-hook 'helm-cleanup-hook #'hkk//helm-cleanup)
+      (global-set-key (kbd "M-x") 'helm-M-x)
+      (global-set-key (kbd "C-x C-f") 'hkk/helm-find-files)
+      (global-set-key (kbd "C-x b") 'helm-buffers-list)
+
       (setq helm-prevent-escaping-from-minibuffer t
             helm-bookmark-show-location t
             helm-display-header-line nil
@@ -691,22 +818,36 @@ Helm
             helm-buffers-fuzzy-matching t)
       (hkk/set-leader-keys
        "<f1>" 'helm-apropos
+       "a'" 'helm-available-repls
        "bb"  'helm-mini
        "Cl" 'helm-colors
        "ff" 'hkk/helm-find-files
        "fF" 'helm-find-files
+       "fL" 'helm-locate
        "fr" 'helm-recentf
+       "hdd" 'helm-apropos
        "hb" 'helm-filtered-bookmarks
-       "hl" 'helm-resume
+       "hm" 'helm-man-woman
        "iu" 'helm-ucs
+       "rl" 'helm-resume
        "rr" 'helm-register
-       "rm" 'helm-all-mark-rings))
-    :config
-    (progn
-      (helm-mode +1)
-      (helm-locate-set-command)))
+       "rs" 'hkk/resume-last-search-buffer
+       "ry" 'helm-show-kill-ring
+       "sl" 'hkk/resume-last-search-buffer
+       "sj" 'hkk/helm-jump-in-buffer
+       "rm" 'helm-all-mark-rings)
+      (after 'helm-files
+        (define-key helm-find-files-map
+          (kbd "C-c C-e") 'hkk/helm-find-files-edit))
+      (define-key minibuffer-local-map (kbd "C-c C-l") 'helm-minibuffer-history)
+      (add-hook 'emacs-startup-hook
+                (lambda ()
+                  (hkk/set-leader-keys
+                   hkk-emacs-command-key 'helm-M-x)))))
+
 #+end_src
 
+*** Helm descbinds
 #+begin_src elisp
   (use-package helm-descbinds
     :ensure t
@@ -718,12 +859,102 @@ Helm
       (hkk/set-leader-keys "?" 'helm-descbinds)))
 #+end_src
 
-Helm flx
+*** Helm flx
 #+begin_src elisp
   (use-package helm-flx
     :ensure t
     :defer t)
 #+end_src
+
+*** Helm ag
+#+begin_src elisp
+  (use-package helm-ag
+    :ensure t
+    :defer t
+    :init
+    (progn
+      (defun hkk//helm-do-ag-region-or-symbol (func &optional dir)
+        (require 'helm-ag)
+        (cl-letf* (((symbol-value 'helm-ag-insert-at-point) 'symbol)
+                   ((symbol-function 'this-fn) (symbol-function 'thing-at-point))
+                   ((symbol-function 'thing-at-point)
+                    (lambda (thing)
+                      (let ((res (if (region-active-p)
+                                     (buffer-substring-no-properties
+                                      (region-beginning) (region-end))
+                                   (this-fn thing))))
+                        (when res (rxt-quote-pcre res))))))
+          (funcall func dir)))
+
+      (defun hkk//helm-do-search-find-tool (base tools default-inputp)
+        (eval
+         `(cond
+           ,@(mapcar
+              (lambda (x)
+                `((executable-find ,x)
+                  ',(let ((func
+                           (intern
+                            (format (if default-inputp
+                                        "hkk/%s-%s-region-or-symbol"
+                                      "hkk/%s-%s")
+                                    base x))))
+                      (if (fboundp func)
+                          func
+                        (intern (format "%s-%s" base x))))))
+              tools)
+           (t 'helm-do-grep))))
+
+      ;; Buffers
+      (defun hkk/helm-buffers-do-ag (&optional _)
+        (interactive)
+        (helm-do-ag-buffers))
+
+      (defun hkk/helm-buffers-do-ag-region-or-symbol ()
+        (interactive)
+        (hkk//helm-do-ag-region-or-symbol 'hkk/helm-buffers-do-ag))
+
+      (defun hkk/helm-buffers-smart-do-search (&optional default-inputp)
+        (interactive)
+        (call-interactively
+         (hkk//helm-do-search-find-tool "helm-buffers-do"
+                                        hkk-search-tools
+                                        default-inputp)))
+
+      (defun hkk/helm-buffers-smart-do-search-region-or-symbol ()
+        (interactive)
+        (hkk/helm-buffers-smart-do-search t))
+
+      ;; files
+      (defun hkk/helm-files-do-ag (&optional dir)
+        (interactive)
+        (helm-do-ag dir))
+
+      (defun hkk/helm-files-smart-do-search (&optional default-inputp)
+        (interactive)
+        (call-interactively
+         (hkk//helm-do-search-find-tool "helm-files-do"
+                                        hkk-search-tools
+                                        default-inputp)))
+
+      (hkk/set-leader-keys
+       "s`" 'helm-ag-pop-stack
+       ;; buffer
+       "sb" 'hkk/helm-buffers-smart-do-search
+       "sB" 'hkk/helm-buffers-smart-do-search-region-or-symbol
+       ;; files
+       "sf" 'hkk/helm-files-smart-do-search
+       "saf" 'helm-do-ag
+       )
+      )
+
+    :config
+    (progn
+      (advice-add 'helm-ag--save-results :after 'hkk//gne-init-helm-ag)
+      (evil-define-key 'normal helm-ag-map "SPC" hkk-default-map)))
+
+#+end_src
+
+#+RESULTS:
 
 Powerline.
 #+begin_src elisp
@@ -761,21 +992,85 @@ Popwin
       (push '("*grep*" :dedicated t :position bottom :stick t :noselect t) popwin:special-display-config)))
 #+end_src
 
+#+begin_src elisp
+  (use-package savehist
+    :init
+    (progn
+      (setq savehist-file (concat user-emacs-directory "savehist")
+            enable-recursive-minibuffers t
+            history-length 1000
+            savehist-additional-variables '(mark-ring
+                                            global-mark-ring
+                                            search-ring
+                                            regexp-search-ring
+                                            extended-command-history)
+            savehist-autosave-interval 60)
+      (savehist-mode t)))
+
+
+  (use-package recentf
+    :config
+    (progn
+      (setq recentf-max-saved-items 1000
+            recentf-max-menu-items 25)
+      (recentf-mode 1)
+      (after 'helm
+             (global-set-key (kbd "C-x C-r") 'helm-recentf))))
+#+end_src
+
 ** Key bindings
 #+begin_src elisp
 (require 'hkk-keybindings)
 #+end_src
 
+
+#+begin_src elisp
+
+  (setq-default avy-keys '(?a ?u ?i ?e ?t ?s ?r ?n))
+
+    (use-package avy
+      :defer t
+      :commands (hkk/avy-open-url hkk/avy-goto-url avy-pop-mark)
+      :init
+      (progn
+        (setq avy-all-windows 'all-frames)
+        (setq avy-background t)
+        (hkk/set-leader-keys
+         "jb" 'avy-pop-mark
+         "jj" 'evil-avy-goto-char
+         "jJ" 'evil-avy-goto-char-2
+         "jl" 'evil-avy-goto-line
+         "ju" 'hkk/avy-goto-url
+         "jw" 'evil-avy-goto-word-or-subword-1
+         "xo" 'hkk/avy-open-url))
+      :config
+      (progn
+        (defun hkk/avy-goto-url ()
+          (interactive)
+          (avy--generic-jump "https?://" nil 'pre))
+        (defun hkk/avy-open-url ()
+          (interactive)
+          (save-excursion
+            (hkk/avy-goto-url)
+            (browse-url-at-point)))))
+#+end_src
+
 ** Languages
-Setting for elisp
+Setting for elisp.
 #+begin_src elisp
 (require 'hkk-elisp)
 #+end_src
 
-Setting for clojure
+Setting for clojure.
 #+begin_src elisp
 (require 'hkk-clojure)
 #+end_src
+
+Setting for markdown
+#+begin_src elisp
+(require 'hkk-markdown)
+#+end_src
+
 
 * Providing
 #+begin_src elisp

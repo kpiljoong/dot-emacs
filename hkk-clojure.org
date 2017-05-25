@@ -1,16 +1,7 @@
 #+TITLE: hkk :: clojure
 
 #+begin_src elisp
-  (use-package clojure-mode
-    :ensure t
-    :defer t
-    :init
-    (progn
-      (add-to-list 'auto-mode-alist '("\\.boot\\'" . clojure-mode))
-      (add-to-list 'magic-mode-alist '(".* boot" . clojure-mode))))
-
   (use-package cider
-    :ensure t
     :defer t
     :init
     (progn
@@ -18,14 +9,61 @@
             cider-repl-pop-to-buffer-on-connect nil
             cider-prompt-save-file-on-load nil
             cider-repl-use-clojure-font-lock t)
+      (push "\\*cider-repl\.\+\\*" hkk-useful-buffers-regexp)
       (add-hook 'clojure-mode-hook 'cider-mode))
     :config
     (progn
-      (evil-set-initial-state 'cider-stracktrace-mode 'motion)
+      (evil-set-initial-state 'cider-stacktrace-mode 'motion)
       (evil-set-initial-state 'cider-popup-buffer-mode 'motion)
-      (setq cider-prompt-for-symbol nil)))
+      (add-hook 'cider--debug-mode-hook 'hkk/cider-debug-setup)
 
-(provide 'hkk-clojure)
+      (evilified-state-evilify cider-stacktrace-mode cider-stacktrace-mode-map
+                               (kbd "C-j") 'cider-stacktrace-next-cause)
+
+      ;; open cider-doc
+      (setq cider-prompt-for-symbol nil)
+
+      (evilified-state-evilify cider-docview-mode cider-docview-mode-map
+                               (kbd "q") 'cider-popup-buffer-quit)
+
+      (setq cider--key-binding-prefixes
+            '(("md" . "debug")
+              ("me" . "evaluation")))
+      (dolist (m '(clojure-mode
+                   clojurec-mode
+                   clojurescript-mode
+                   clojurex-mode
+                   cider-repl-mode
+                   cider-clojure-interaction-mode))
+        (mapc (lambda (x) (hkk/declare-prefix-for-mode
+                           m (car x) (cdr x)))
+              cider--key-binding-prefixes)
+
+        (hkk/set-leader-keys-for-major-mode m
+                                            "ha" 'cider-apropos
+                                            "hh" 'cider-doc
+
+                                            "eb" 'cider-eval-buffer
+                                            "ee" 'cider-eval-last-exp
+
+                                            "'" 'cider-jack-in))
+
+      ;; cider-repl-mode only
+      (hkk/set-leader-keys-for-major-mode 'cider-repl-mode
+                                          "," 'cider-repl-handle-shortcut)
+
+      (evil-define-key 'normal cider-repl-mode-map
+        "C-j" 'cider-repl-next-input
+        "C-k" 'cider-repl-previous-input)))
+
+    (use-package clojure-mode
+      :defer t
+      :init
+      (progn
+        (add-to-list 'auto-mode-alist '("\\.boot\\'" . clojure-mode))
+        (add-to-list 'magic-mode-alist '(".* boot" . clojure-mode))))
+
+  (provide 'hkk-clojure)
 #+end_src
 
 #+PROPERTY: tangle "~/.emacs.d/hkk/hkk-clojure.el"

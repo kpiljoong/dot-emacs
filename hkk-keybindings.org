@@ -150,6 +150,16 @@ Toggle maximize frame.
     :evil-leader "TM")
 #+end_src
 
+Dired.
+#+begin_src elisp
+  (hkk/set-leader-keys
+   "ad" 'dired
+   "fj" 'dired-jump
+   "jd" 'dired-jump
+   "jD" 'dired-jump-other-window)
+#+end_src
+
+
 
 Provide this!
 #+begin_src elisp

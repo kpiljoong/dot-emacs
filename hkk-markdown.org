@@ -1,0 +1,13 @@
+#+TITLE: hkk :: markdown
+
+#+begin_src elisp
+  (use-package markdown
+    :config
+    (progn
+      (add-to-list 'auto-mode-alist '("\\.markdown\\'" . markdown-mode))
+      (add-to-list 'auto-mode-alist '("\\.md\\'" . markdown-mode))))
+
+  (provide 'hkk-markdown)
+#+end_src
+
+#+PROPERTY: tangle "~/.emacs.d/hkk/hkk-markdown.el"
