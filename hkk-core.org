@@ -1066,6 +1066,12 @@ Setting for clojure.
 (require 'hkk-clojure)
 #+end_src
 
+Setting for golang.
+#+begin_src elisp
+(require 'hkk-go)
+#+end_src
+
+
 Setting for markdown
 #+begin_src elisp
 (require 'hkk-markdown)

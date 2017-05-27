@@ -1,0 +1,18 @@
+#+TITLE: hkk :: go
+
+#+begin_src elisp
+  (use-package go-mode
+    :ensure t
+    :defer t
+    :config
+    (progn
+      (add-hook 'before-save-hook 'gofmt-before-save)))
+
+  (use-package company-go
+    :ensure t
+    :defer t)
+
+  (provide 'hkk-go)
+#+end_src
+
+#+PROPERTY: tangle "~/.emacs.d/hkk/hkk-go.el"
