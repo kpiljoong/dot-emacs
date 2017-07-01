@@ -1,0 +1,31 @@
+#+TITLE: hkk :: osx
+
+#+begin_src elisp
+
+  (defvar osx-use-option-as-meta t)
+
+  (setq mac-command-key-is-meta nil)
+  (setq mac-command-modifier 'super)
+
+  (when osx-use-option-as-meta
+    (setq mac-option-key-is-meta t))
+
+  (setq mac-option-modifier (if osx-use-option-as-meta 'meta nil))
+
+  (global-set-key (kbd "C-SPC") 'toggle-input-method)
+
+
+  (global-set-key (kbd "s-v") 'yank)
+  (global-set-key (kbd "s-c") 'evil-yank)
+  (global-set-key (kbd "s-a") 'mark-whole-buffer)
+  (global-set-key (kbd "s-x") 'kill-region)
+  (global-set-key (kbd "s-w") 'delete-window)
+  (global-set-key (kbd "s-W") 'delete-frame)
+
+  (if (eq system-type 'darwin)
+      (add-hook 'after-init-hook 'exec-path-from-shell-initialize))
+
+  (provide 'hkk-osx)
+#+end_src
+
+#+PROPERTY: tangle "~/.emacs.d/hkk/hkk-osx.el"

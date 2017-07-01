@@ -3,7 +3,7 @@
 ** Startup
 #+begin_src elisp
 
-(setq debug-on-error t)
+;;(setq debug-on-error t)
 (message "hkk :: core")
 
 #+end_src
@@ -124,6 +124,7 @@ Use system trash for file deletion
 #+begin_src elisp
   (setq delete-by-moving-to-trash t)
 #+end_src
+
 
 
 ** Display
@@ -579,7 +580,21 @@ Better names for duplicate buffers.
 #+begin_src elisp
 (require 'hkk-evil)
 (require 'hkk-theme)
+
+(if (eq system-type 'darwin)
+    (require 'hkk-osx))
 #+end_src
+
+
+** exec-path-from-shell
+#+begin_src elisp
+  (use-package exec-path-from-shell
+    :ensure t
+    :init
+    (when (memq window-system '(mac ns x))
+      (exec-path-from-shell-initialize)))
+#+end_src
+
 
 ** Which key
 #+begin_src elisp
@@ -1069,6 +1084,11 @@ Setting for clojure.
 Setting for golang.
 #+begin_src elisp
 (require 'hkk-go)
+#+end_src
+
+Setting for ocaml
+#+begin_src elisp
+(require 'hkk-ocaml)
 #+end_src
 
 
